@@ -1,23 +1,44 @@
-function! s:GetNameFromLine(line)
-    return substitute(a:line, '\(\w\+\).\+', '\1', '')
+function! s:CheckExtractorForFiletype()
+    if &filetype == 'python'
+        let b:name_extractor = 's:GetPython3Names'
+    else
+        echom "No names extractor for filetype=" . &filetype
+    endif
 endfunction
 
-function! s:GetNames()
-    let ctags_output = system('ctags -f - ' . expand('%'))
-    let lines = split(ctags_output, '\n')
-    return sort(map(lines, 's:GetNameFromLine(v:val)'))
+function s:GetPython3Names()
+    let names = system('py3names ' . expand('%'))
+    return split(names, '\n')
+endf
+
+function s:GetNames()
+    call s:CheckExtractorForFiletype()
+    if exists('b:name_extractor')
+        let names = eval(b:name_extractor . '()')
+        return names
+    endif
 endfunction
 
 function! s:CodeInColorInit()
     let names = s:GetNames()
-    syntax off
+    let colorNum = 58
+    set syntax=off
 
     for name in names
         let groupname = substitute(name, '^\w', '\U&', '')
-        execute 'syntax match ' . groupname . ' "' . name . '"'
+        execute 'syntax match ' . groupname . ' "\<' . name . '\>"'
         "calculate color for each word individually
-        execute 'hi ' . groupname . ' ctermfg=145'
+        execute 'hi ' . groupname . ' ctermfg=' . colorNum
+        let colorNum += 1
     endfor
 endfunction
 
-command! CodeInColor call s:CodeInColorInit()
+function! s:CodeInColorStop()
+    exec 'setf ' . &ft
+    exec 'syntax off'
+    exec 'syntax on'
+endfunction
+
+command! StartCodeInColor call s:CodeInColorInit()
+command! StopCodeInColor call s:CodeInColorStop()
+command! ShowNames echo s:GetNames()
